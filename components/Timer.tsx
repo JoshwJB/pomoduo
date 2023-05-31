@@ -1,8 +1,10 @@
 'use client';
 
-import {FC, useState} from 'react';
+import {FC, useEffect, useState} from 'react';
 import {useInterval} from "@/components/hooks/UseInterval";
 import {addMinutes, add} from 'date-fns'
+import {supabase} from "@/lib/SupabaseClient";
+import {useParams} from "next/navigation";
 
 type TimerState = {
     hours: number;
@@ -10,10 +12,41 @@ type TimerState = {
     seconds: number;
 }
 
-export const Timer: FC = () => {
+export const Timer = () => {
+    const params = useParams();
+    const channel = supabase.channel(params.roomId);
     const [paused, setPaused] = useState(false);
     const [timerEndDate, setTimerEndDate] = useState<Date | undefined>(undefined);
     const [timerState, setTimerState] = useState<TimerState>({hours: 0, minutes: 0, seconds: 0});
+
+    useEffect(() => {
+        const row = supabase.from("pomoduo").select().eq("room", params.roomId).then(row => {
+            console.log("row", row);
+            setTimerEndDate(new Date(row.data[0].timer_end_time));
+            setPaused(row.data[0].paused);
+        });
+    }, [])
+
+    useEffect(() => {
+        channel.on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'pomoduo',
+                filter: `room=eq.${params.roomId}`,
+            },
+            (payload: any) => {
+                console.log(payload);
+                setTimerEndDate(new Date(payload.new.timer_end_time));
+                setPaused(payload.new.paused);
+            }
+        ).subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        }
+    }, [channel, params]);
 
     // update every second
     useInterval(() => {
@@ -39,14 +72,20 @@ export const Timer: FC = () => {
         return string;
     };
 
-    const start = () => {
+    const start = async () => {
         setPaused(false);
-        if (timerEndDate === undefined) return setTimerEndDate(addMinutes(new Date(), 25));
-        setTimerEndDate(add(new Date(), timerState));
+        const newEndTime = timerEndDate === undefined ? addMinutes(new Date(), 25) : add(new Date(), timerState);
+        setTimerEndDate(newEndTime);
+        await supabase.from("pomoduo").upsert({
+            room: params.roomId,
+            timer_end_time: newEndTime.toISOString(),
+            paused: false
+        });
     }
 
-    const pause = () => {
+    const pause = async () => {
         setPaused(true);
+        await supabase.from("pomoduo").update({paused: true}).eq("room", params.roomId);
     }
 
     return (
