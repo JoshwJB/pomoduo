@@ -6,6 +6,7 @@ import {addMinutes, add} from "date-fns";
 import {supabase} from "@/lib/SupabaseClient";
 import {useParams} from "next/navigation";
 import {Button} from "@/components/Button";
+import useSound from "use-sound";
 
 type TimerState = {
   hours: number;
@@ -18,10 +19,13 @@ interface Props {
 }
 
 export const Timer = ({roomRow}: Props) => {
+  const [playSound] = useSound("/success-fanfare-trumpets.mp3", {volume: 1});
   const params = useParams();
   const channel = supabase.channel(params.roomId);
   const [paused, setPaused] = useState(roomRow?.paused ?? false);
-  const [timerEndDate, setTimerEndDate] = useState<Date | undefined>(roomRow?.timer_end_time);
+  const [timerEndDate, setTimerEndDate] = useState<Date | undefined>(
+    roomRow?.timer_end_time ? new Date(roomRow.timer_end_time) : undefined,
+  );
   const [timerState, setTimerState] = useState<TimerState>({
     hours: 0,
     minutes: 0,
@@ -56,7 +60,11 @@ export const Timer = ({roomRow}: Props) => {
     if (timerEndDate === undefined) return setTimerState({hours: 0, minutes: 0, seconds: 0});
     const now = new Date();
     const difference = timerEndDate.getTime() - now.getTime();
-    if (difference < 0) return setTimerEndDate(undefined);
+    if (difference < 0) {
+      setTimerEndDate(undefined);
+      playSound();
+      return;
+    }
 
     const hours = Math.floor(difference / 1000 / 60 / 60);
     const minutes = Math.floor(difference / 1000 / 60) % 60;
@@ -108,7 +116,7 @@ export const Timer = ({roomRow}: Props) => {
     <div className="flex flex-col items-center">
       <h2 className="text-4xl mb-8 font-bold">{formatTimeRemaining()}</h2>
 
-      <div className="flex justify-between">
+      <div className="flex justify-between gap-2">
         {paused && timerEndDate && (
           <Button
             variant="outline"
@@ -143,9 +151,11 @@ export const Timer = ({roomRow}: Props) => {
       {!timerEndDate && (
         <div>
           <h5>Choose a duration:</h5>
-          <div>
+          <div className="flex gap-2">
             {[5, 10, 15, 20, 25, 30].map((minutes) => (
               <Button
+                variant="outline"
+                className="w-16"
                 key={minutes}
                 onClick={() => start(minutes)}
               >
