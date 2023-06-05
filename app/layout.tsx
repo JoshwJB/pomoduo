@@ -1,8 +1,11 @@
 import "./globals.css";
-import {Inter} from "next/font/google";
+import {Roboto_Mono} from "next/font/google";
 import {cx} from "class-variance-authority";
 
-const inter = Inter({subsets: ["latin"]});
+const robotoMono = Roboto_Mono({
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata = {
   title: "Create Next App",
@@ -12,7 +15,12 @@ export const metadata = {
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en">
-      <body className={cx(inter.className, "bg-emerald-900")}>
+      <body
+        className={cx(
+          robotoMono.className,
+          "bg-gradient-to-r from-yellow-200 via-green-200 to-green-300 animate-gradient-x",
+        )}
+      >
         <main className="flex min-h-screen flex-col items-center justify-center p-24">
           <h1 className="text-6xl font-bold mb-8">PomoDuo</h1>
 
