@@ -1,5 +1,16 @@
 import {Timer} from "@/components/Timer";
 import {supabase} from "@/lib/SupabaseClient";
+import {Metadata} from "next";
+
+export async function generateMetadata({params}: Props): Promise<Metadata> {
+  return {
+    title: `${params.roomId} | PomoDuo`,
+  };
+}
+
+export const metadata = ({params}: Props) => ({
+  title: `${params.roomId} | PomoDuo`,
+});
 
 interface Props {
   params: {roomId: string};
