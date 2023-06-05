@@ -8,10 +8,6 @@ export async function generateMetadata({params}: Props): Promise<Metadata> {
   };
 }
 
-export const metadata = ({params}: Props) => ({
-  title: `${params.roomId} | PomoDuo`,
-});
-
 interface Props {
   params: {roomId: string};
 }
