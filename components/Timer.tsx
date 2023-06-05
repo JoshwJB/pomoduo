@@ -5,6 +5,7 @@ import {useInterval} from "@/components/hooks/UseInterval";
 import {addMinutes, add} from "date-fns";
 import {supabase} from "@/lib/SupabaseClient";
 import {useParams} from "next/navigation";
+import {Button} from "@/components/Button";
 
 type TimerState = {
   hours: number;
@@ -38,7 +39,6 @@ export const Timer = ({roomRow}: Props) => {
           filter: `room=eq.${params.roomId}`,
         },
         (payload: any) => {
-          console.log(payload);
           setTimerEndDate(new Date(payload.new.timer_end_time));
           setPaused(payload.new.paused);
         },
@@ -91,11 +91,24 @@ export const Timer = ({roomRow}: Props) => {
   };
 
   return (
-    <div>
-      <h2 className="text-4xl py-6">{formatTimeRemaining()}</h2>
+    <div className="flex flex-col items-center">
+      <h2 className="text-4xl mb-8 font-bold">{formatTimeRemaining()}</h2>
 
-      <button onClick={start}>Start</button>
-      <button onClick={pause}>Pause</button>
+      <div className="flex justify-between gap-2">
+        <Button
+          variant="outline"
+          onClick={start}
+        >
+          Start
+        </Button>
+
+        <Button
+          variant="outline"
+          onClick={pause}
+        >
+          Pause
+        </Button>
+      </div>
     </div>
   );
 };
