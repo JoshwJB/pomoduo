@@ -1,11 +1,12 @@
 import {Timer} from "@/components/Timer";
+import {supabase} from "@/lib/SupabaseClient";
 
-export default function TimerRoom() {
-    return (
-        <main className="flex min-h-screen flex-col items-center justify-center p-24">
-            <h1 className="text-6xl font-bold">PomoDuo</h1>
+interface Props {
+  params: {roomId: string};
+}
 
-            <Timer timerEndDate={undefined} />
-        </main>
-    );
+export default async function TimerRoom({params}: Props): Promise<JSX.Element> {
+  const {data} = await supabase.from("pomoduo").select().eq("room", params.roomId);
+
+  return <Timer roomRow={data[0]} />;
 }
