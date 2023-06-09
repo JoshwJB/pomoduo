@@ -2,11 +2,12 @@
 
 import {useEffect, useState} from "react";
 import {useInterval} from "@/components/hooks/UseInterval";
-import {addMinutes, add} from "date-fns";
+import {addSeconds, differenceInSeconds} from "date-fns";
 import {supabase} from "@/lib/SupabaseClient";
 import {useParams} from "next/navigation";
 import {Button} from "@/components/Button";
 import useSound from "use-sound";
+import {pause, reset, resume, start} from "@/lib/TimerActions";
 
 type TimerState = {
   hours: number;
@@ -22,7 +23,9 @@ export const Timer = ({roomRow}: Props) => {
   const [playSound] = useSound("/success-fanfare-trumpets.mp3", {volume: 1});
   const params = useParams();
   const channel = supabase.channel(params.roomId);
-  const [paused, setPaused] = useState(roomRow?.paused ?? false);
+  const [timerPausedDate, setTimerPausedTime] = useState(
+    roomRow?.timer_paused_time ? new Date(roomRow.timer_paused_time) : undefined,
+  );
   const [timerEndDate, setTimerEndDate] = useState<Date | undefined>(
     roomRow?.timer_end_time ? new Date(roomRow.timer_end_time) : undefined,
   );
@@ -31,6 +34,19 @@ export const Timer = ({roomRow}: Props) => {
     minutes: 0,
     seconds: 0,
   });
+
+  useEffect(() => {
+    if (timerEndDate && timerPausedDate) {
+      const now = new Date();
+      const difference =
+        addSeconds(new Date(), differenceInSeconds(timerEndDate, timerPausedDate)).getTime() - now.getTime();
+
+      const hours = Math.floor(difference / 1000 / 60 / 60);
+      const minutes = Math.floor(difference / 1000 / 60) % 60;
+      const seconds = Math.floor(difference / 1000) % 60;
+      setTimerState({hours, minutes, seconds});
+    }
+  }, []);
 
   useEffect(() => {
     channel
@@ -43,8 +59,9 @@ export const Timer = ({roomRow}: Props) => {
           filter: `room=eq.${params.roomId}`,
         },
         (payload: any) => {
-          setTimerEndDate(new Date(payload.new.timer_end_time));
-          setPaused(payload.new.paused);
+          console.log("subscription", payload.new);
+          setTimerEndDate(payload.new.timer_end_time ? new Date(payload.new.timer_end_time) : undefined);
+          setTimerPausedTime(payload.new.timer_paused_time ? new Date(payload.new.timer_paused_time) : undefined);
         },
       )
       .subscribe();
@@ -52,11 +69,11 @@ export const Timer = ({roomRow}: Props) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [channel, params]);
+  }, []);
 
   // update every second
   useInterval(() => {
-    if (paused) return;
+    if (timerPausedDate) return;
     if (timerEndDate === undefined) return setTimerState({hours: 0, minutes: 0, seconds: 0});
     const now = new Date();
     const difference = timerEndDate.getTime() - now.getTime();
@@ -70,7 +87,7 @@ export const Timer = ({roomRow}: Props) => {
     const minutes = Math.floor(difference / 1000 / 60) % 60;
     const seconds = Math.floor(difference / 1000) % 60;
     setTimerState({hours, minutes, seconds});
-  }, 1000);
+  }, 100);
 
   const formatTimeRemaining = (): string => {
     const {hours, minutes, seconds} = timerState;
@@ -82,34 +99,10 @@ export const Timer = ({roomRow}: Props) => {
     return string;
   };
 
-  const start = async (minutes: number) => {
-    const newEndTime = addMinutes(new Date(), minutes);
-    await supabase.from("pomoduo").upsert({
-      room: params.roomId,
-      timer_end_time: newEndTime.toISOString(),
-      paused: false,
-    });
-  };
-
-  const resume = async () => {
-    const newEndTime = add(new Date(), timerState);
-    await supabase.from("pomoduo").upsert({
-      room: params.roomId,
-      timer_end_time: newEndTime.toISOString(),
-      paused: false,
-    });
-  };
-
-  const reset = async () => {
-    await supabase.from("pomoduo").upsert({
-      room: params.roomId,
-      timer_end_time: null,
-      paused: false,
-    });
-  };
-
-  const pause = async () => {
-    await supabase.from("pomoduo").update({paused: true}).eq("room", params.roomId);
+  const resumeTimer = async () => {
+    if (!timerEndDate || !timerPausedDate) return;
+    const newEndTime = addSeconds(new Date(), differenceInSeconds(timerEndDate, timerPausedDate));
+    await resume(params.roomId, newEndTime);
   };
 
   return (
@@ -117,20 +110,20 @@ export const Timer = ({roomRow}: Props) => {
       <h2 className="text-4xl mb-8 font-bold">{formatTimeRemaining()}</h2>
 
       <div className="flex justify-between gap-2">
-        {paused && timerEndDate && (
+        {timerPausedDate && timerEndDate && (
           <Button
             variant="outline"
-            onClick={resume}
+            onClick={resumeTimer}
             size="lg"
           >
             Resume
           </Button>
         )}
 
-        {!paused && timerEndDate && (
+        {!timerPausedDate && timerEndDate && (
           <Button
             variant="outline"
-            onClick={pause}
+            onClick={() => pause(params.roomId)}
             size="lg"
           >
             Pause
@@ -140,7 +133,7 @@ export const Timer = ({roomRow}: Props) => {
         {timerEndDate && (
           <Button
             variant="outline"
-            onClick={reset}
+            onClick={() => reset(params.roomId)}
             size="lg"
           >
             Reset
@@ -157,7 +150,7 @@ export const Timer = ({roomRow}: Props) => {
                 variant="outline"
                 className="w-16"
                 key={minutes}
-                onClick={() => start(minutes)}
+                onClick={() => start(params.roomId, minutes)}
               >
                 {minutes}m
               </Button>

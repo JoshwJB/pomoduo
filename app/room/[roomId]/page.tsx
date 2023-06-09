@@ -2,8 +2,6 @@ import {Timer} from "@/components/Timer";
 import {supabase} from "@/lib/SupabaseClient";
 import {Metadata} from "next";
 
-export const revalidate = 0;
-
 export async function generateMetadata({params}: Props): Promise<Metadata> {
   return {
     title: `${params.roomId} | PomoDuo`,
