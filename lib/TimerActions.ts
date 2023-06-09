@@ -36,4 +36,5 @@ export async function start(roomId: string, minutes: number) {
     timer_end_time: newEndTime.toISOString(),
     timer_paused_time: null,
   });
+  revalidate();
 }
