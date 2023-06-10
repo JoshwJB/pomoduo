@@ -2,9 +2,6 @@ import {Timer} from "@/components/Timer";
 import {supabase} from "@/lib/SupabaseClient";
 import {Metadata} from "next";
 
-export const dynamic = "force-static",
-  dynamicParams = true;
-
 export function generateStaticParams() {
   return [];
 }
