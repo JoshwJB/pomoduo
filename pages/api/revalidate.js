@@ -10,9 +10,7 @@ export default async function handler(req, res) {
 
   try {
     const roomSlug = req.body;
-
     await res.revalidate(`/room/${roomSlug}`);
-
     return res.status(200).send("Success!");
   } catch (err) {
     return res.status(500).send("Error revalidating");
