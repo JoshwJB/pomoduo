@@ -15,5 +15,10 @@ interface Props {
 export default async function TimerRoom({params}: Props): Promise<JSX.Element> {
   const {data} = await supabase.from("pomoduo").select().eq("room", params.roomId);
 
-  return <Timer roomRow={data[0]} />;
+  return (
+    <Timer
+      roomRow={data[0]}
+      roomId={params.roomId}
+    />
+  );
 }

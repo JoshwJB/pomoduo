@@ -1,14 +1,22 @@
 "use server";
 
-import {revalidatePath} from "next/cache";
 import {supabase} from "@/lib/SupabaseClient";
 import {addMinutes} from "date-fns";
 
-const revalidate = () => revalidatePath("/room/[roomId]");
+const revalidate = async (roomId: string) => {
+  if (!process.env.URL || !process.env.REVALIDATE_SECRET) throw Error("Missing env variable/s");
+  const requestHeaders: HeadersInit = new Headers();
+  requestHeaders.set("x-vercel-reval-key", process.env.REVALIDATE_SECRET);
+  await fetch(`${process.env.URL}/api/revalidate`, {
+    method: "POST",
+    body: roomId,
+    headers: requestHeaders,
+  });
+};
 
 export async function pause(roomId: string) {
   await supabase.from("pomoduo").update({timer_paused_time: new Date().toISOString()}).eq("room", roomId);
-  revalidate();
+  await revalidate(roomId);
 }
 
 export async function reset(roomId: string) {
@@ -17,7 +25,7 @@ export async function reset(roomId: string) {
     timer_end_time: null,
     timer_paused_time: null,
   });
-  revalidate();
+  await revalidate(roomId);
 }
 
 export async function resume(roomId: string, newEndTime: Date) {
@@ -26,7 +34,7 @@ export async function resume(roomId: string, newEndTime: Date) {
     timer_end_time: newEndTime.toISOString(),
     timer_paused_time: null,
   });
-  revalidate();
+  await revalidate(roomId);
 }
 
 export async function start(roomId: string, minutes: number) {
@@ -36,5 +44,5 @@ export async function start(roomId: string, minutes: number) {
     timer_end_time: newEndTime.toISOString(),
     timer_paused_time: null,
   });
-  revalidate();
+  await revalidate(roomId);
 }

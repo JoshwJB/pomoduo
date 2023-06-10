@@ -9,46 +9,33 @@ import {Button} from "@/components/Button";
 import useSound from "use-sound";
 import {pause, reset, resume, start} from "@/lib/TimerActions";
 
-type TimerState = {
-  hours: number;
-  minutes: number;
-  seconds: number;
-};
-
 interface Props {
   roomRow: any;
+  roomId: string;
 }
 
-export const Timer = ({roomRow}: Props) => {
+export const Timer = ({roomRow, roomId}: Props) => {
   const [playSound] = useSound("/success-fanfare-trumpets.mp3", {volume: 1});
   const params = useParams();
-  const channel = supabase.channel(params.roomId);
+
+  const channel = supabase.channel(roomId);
   const [timerPausedDate, setTimerPausedTime] = useState(
     roomRow?.timer_paused_time ? new Date(roomRow.timer_paused_time) : undefined,
   );
   const [timerEndDate, setTimerEndDate] = useState<Date | undefined>(
     roomRow?.timer_end_time ? new Date(roomRow.timer_end_time) : undefined,
   );
-  const [timerState, setTimerState] = useState<TimerState>({
-    hours: 0,
-    minutes: 0,
-    seconds: 0,
-  });
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
 
   useEffect(() => {
     if (timerEndDate && timerPausedDate) {
-      const now = new Date();
-      const difference =
-        addSeconds(new Date(), differenceInSeconds(timerEndDate, timerPausedDate)).getTime() - now.getTime();
-
-      const hours = Math.floor(difference / 1000 / 60 / 60);
-      const minutes = Math.floor(difference / 1000 / 60) % 60;
-      const seconds = Math.floor(difference / 1000) % 60;
-      setTimerState({hours, minutes, seconds});
+      const seconds = differenceInSeconds(
+        addSeconds(new Date(), differenceInSeconds(timerEndDate, timerPausedDate)),
+        new Date(),
+      );
+      setSecondsRemaining(seconds);
     }
-  }, []);
 
-  useEffect(() => {
     channel
       .on(
         "postgres_changes",
@@ -56,7 +43,7 @@ export const Timer = ({roomRow}: Props) => {
           event: "*",
           schema: "public",
           table: "pomoduo",
-          filter: `room=eq.${params.roomId}`,
+          filter: `room=eq.${roomId}`,
         },
         (payload: any) => {
           console.log("subscription", payload.new);
@@ -74,27 +61,22 @@ export const Timer = ({roomRow}: Props) => {
   // update every second
   useInterval(() => {
     if (timerPausedDate) return;
-    if (timerEndDate === undefined) return setTimerState({hours: 0, minutes: 0, seconds: 0});
-    const now = new Date();
-    const difference = timerEndDate.getTime() - now.getTime();
-    if (difference < 0) {
+    if (timerEndDate === undefined) return setSecondsRemaining(0);
+    const secondsLeft = differenceInSeconds(timerEndDate, new Date());
+    if (secondsLeft < 0) {
       setTimerEndDate(undefined);
       playSound();
       return;
     }
-
-    const hours = Math.floor(difference / 1000 / 60 / 60);
-    const minutes = Math.floor(difference / 1000 / 60) % 60;
-    const seconds = Math.floor(difference / 1000) % 60;
-    setTimerState({hours, minutes, seconds});
+    setSecondsRemaining(secondsLeft);
   }, 100);
 
   const formatTimeRemaining = (): string => {
-    const {hours, minutes, seconds} = timerState;
     let string = "";
+    const minutes = Math.floor(secondsRemaining / 60);
+    const seconds = secondsRemaining % 60;
 
-    if (hours > 0) string += `${hours}h `;
-    if (minutes >= 0) string += `${minutes}m `;
+    if (minutes >= 0) string += `${Math.floor(secondsRemaining / 60)}m `;
     if (seconds >= 0) string += `${seconds}s`;
     return string;
   };
@@ -102,7 +84,7 @@ export const Timer = ({roomRow}: Props) => {
   const resumeTimer = async () => {
     if (!timerEndDate || !timerPausedDate) return;
     const newEndTime = addSeconds(new Date(), differenceInSeconds(timerEndDate, timerPausedDate));
-    await resume(params.roomId, newEndTime);
+    await resume(roomId, newEndTime);
   };
 
   return (
@@ -123,7 +105,7 @@ export const Timer = ({roomRow}: Props) => {
         {!timerPausedDate && timerEndDate && (
           <Button
             variant="outline"
-            onClick={() => pause(params.roomId)}
+            onClick={() => pause(roomId)}
             size="lg"
           >
             Pause
@@ -133,7 +115,7 @@ export const Timer = ({roomRow}: Props) => {
         {timerEndDate && (
           <Button
             variant="outline"
-            onClick={() => reset(params.roomId)}
+            onClick={() => reset(roomId)}
             size="lg"
           >
             Reset
@@ -150,7 +132,7 @@ export const Timer = ({roomRow}: Props) => {
                 variant="outline"
                 className="w-16"
                 key={minutes}
-                onClick={() => start(params.roomId, minutes)}
+                onClick={() => start(roomId, minutes)}
               >
                 {minutes}m
               </Button>
